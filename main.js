@@ -1,106 +1,212 @@
-import * as THREE from './three.module.js';
-import { GLTFLoader } from './GLTFLoader.js';
-import { ARButton } from './ARButton.js';
+import * as THREE from "three";
+import { DeviceOrientationControls } from "three/examples/jsm/controls/DeviceOrientationControls";
+let w;
+let h;
+let canvas;
+let scene;
+let camera;
+let renderer;
+let object;
+let controls;
 
-// シーン、カメラ、レンダラーの初期設定
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.domElement.style.position = 'absolute';
-renderer.domElement.style.top = '0';
-document.body.appendChild(renderer.domElement);
-renderer.xr.enabled = true;
+let deviceOrienModal = null;
+let deviceOrienModalButton = null;
 
-// 3Dモデルを配置するマーカー（仮）の作成
-const markerGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.01, 32);
-const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 });
-const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-marker.matrixAutoUpdate = false;
-marker.visible = false;
-scene.add(marker);
+let video = null;
+let videoInput = null;
+let videoStream = null;
 
-// GLTFモデルの読み込み
-const loader = new GLTFLoader();
-let loadedModel;
-loader.load('./box.glb', (gltf) => {
-    loadedModel = gltf.scene;
-    // モデルのサイズを調整
-    loadedModel.scale.set(0.2, 0.2, 0.2);
-});
+const initVideo = () => {
+  video = document.getElementById("camera");
+  video.addEventListener("loadedmetadata", adjustVideo);
 
-// UI要素の取得とARButtonの追加
-const titleContainer = document.getElementById('title-container');
-const arButton = ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] });
-document.body.appendChild(arButton);
+  navigator.mediaDevices
+    .enumerateDevices()
+    .then((devices) => {
+      videoInput = devices.filter((device) => device.kind === "videoinput");
+      getVideo();
+    })
+    .catch(function (error) {
+      console.log(error);
+    });
+};
 
-let hitTestSource = null;
-let hitTestSourceRequested = false;
+const setVideo = () => {
+  return {
+    audio: false,
+    video: {
+      deviceId: videoInput,
+      facingMode: "environment",
+      width: { min: 1280, max: 1920 },
+      height: { min: 720, max: 1080 },
+    },
+  };
+};
 
-// ARセッションの開始・終了イベント
-renderer.xr.addEventListener('sessionstart', () => {
-    titleContainer.style.display = 'none';
-    renderer.domElement.style.zIndex = -1;
-});
+const getVideo = () => {
+  if (videoStream) {
+    videoStream.getTracks().forEach((track) => track.stop());
+  }
+  navigator.mediaDevices
+    .getUserMedia(setVideo())
+    .then(function (stream) {
+      video.srcObject = stream;
+      video.play();
+      videoStream = stream;
+    })
+    .catch(function (error) {
+      console.log(error);
+      alert(
+        "カメラの使用が拒否されています。\nページを再読み込みして使用を許可するか、ブラウザの設定をご確認ください。"
+      );
+    });
+};
 
-renderer.xr.addEventListener('sessionend', () => {
-    titleContainer.style.display = 'block';
-    renderer.domElement.style.zIndex = 0;
-});
+const adjustVideo = () => {
+  const windowWidth = window.innerWidth;
+  const windowHeight = window.innerHeight;
+  const videoWidth = video.videoWidth;
+  const videoHeight = video.videoHeight;
 
-// アニメーションループ
-renderer.setAnimationLoop(render);
+  let videoAspect: number = videoWidth / videoHeight;
+  let windowAspect: number = windowWidth / windowHeight;
 
-function render(time, frame) {
-    if (frame) {
-        const referenceSpace = renderer.xr.getReferenceSpace();
-        const session = renderer.xr.getSession();
+  if (windowAspect < videoAspect) {
+    let newWidth: number = videoAspect * windowHeight;
+    video.style.width = newWidth + "px";
+    video.style.marginLeft = -(newWidth - windowWidth) / 2 + "px";
+    video.style.height = windowHeight + "px";
+    video.style.marginTop = "0px";
+  } else {
+    let newHeight: number = 1 / (videoAspect / windowWidth);
+    video.style.height = newHeight + "px";
+    video.style.marginTop = -(newHeight - windowHeight) / 2 + "px";
+    video.style.width = windowWidth + "px";
+    video.style.marginLeft = "0px";
+  }
+};
 
-        if (hitTestSourceRequested === false) {
-            session.requestReferenceSpace('viewer').then((viewerSpace) => {
-                session.requestHitTestSource({ space: viewerSpace }).then((source) => {
-                    hitTestSource = source;
-                });
-            });
-            session.addEventListener('end', () => {
-                hitTestSourceRequested = false;
-                hitTestSource = null;
-            });
-            hitTestSourceRequested = true;
-        }
+const isIos = () => {
+  const ua = navigator.userAgent.toLowerCase();
+  return (
+    ua.indexOf("iphone") >= 0 ||
+    ua.indexOf("ipad") >= 0 ||
+    ua.indexOf("ipod") >= 0
+  );
+};
 
-        if (hitTestSource) {
-            const hitTestResults = frame.getHitTestResults(hitTestSource);
-            if (hitTestResults.length > 0) {
-                const hit = hitTestResults[0];
-                const pose = hit.getPose(referenceSpace);
-                
-                // マーカーをAR空間に表示
-                marker.visible = true;
-                marker.matrix.fromArray(pose.transform.matrix);
-            } else {
-                // 平面が検出されない場合、マーカーを非表示にする
-                marker.visible = false;
-            }
-        }
-    }
+const checkDeviceOrien = () => {
+  return new Promise((resolve, reject) => {
+    if (!isIos()) resolve("resolve");
 
-    renderer.render(scene, camera);
-}
+    const deviceOrienEvent = () => {
+      hideDeviceOrienModal();
+      window.removeEventListener("deviceorientation", deviceOrienEvent, false);
+      resolve("resolve");
+    };
+    window.addEventListener("deviceorientation", deviceOrienEvent, false);
 
-// 画面タップでモデルを配置
-window.addEventListener('click', () => {
-    if (renderer.xr.isPresenting && marker.visible && loadedModel) {
-        const newModel = loadedModel.clone();
-        newModel.matrix.copy(marker.matrix);
-        newModel.visible = true;
-        scene.add(newModel);
-    }
-});
+    deviceOrienModal = document.getElementById("device-orien-modal");
+    deviceOrienModalButton = document.getElementById(
+      "device-orien-modal-button"
+    );
+    const alertMessage =
+      "モーションセンサーの使用が拒否されました。\nこのページを楽しむには、デバイスモーションセンサーの使用を許可する必要があります。\nSafariのアプリを再起動して、モーションセンサーの使用（「動作と方向」へのアクセス）を許可をしてください。";
+    deviceOrienModal.classList.remove("is-hidden");
 
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-window.addEventListener('resize', onWindowResize);
+    deviceOrienModalButton.addEventListener("click", () => {
+      if (
+        DeviceMotionEvent &&
+        (DeviceMotionEvent as any).requestPermission &&
+        typeof (DeviceMotionEvent as any).requestPermission === "function"
+      ) {
+        (DeviceMotionEvent as any).requestPermission().then((res: any) => {});
+      }
+      if (
+        DeviceOrientationEvent &&
+        (DeviceOrientationEvent as any).requestPermission &&
+        typeof (DeviceOrientationEvent as any).requestPermission === "function"
+      ) {
+        (DeviceOrientationEvent as any).requestPermission().then((res: any) => {
+          console.log(res);
+          if (res === "granted") {
+            hideDeviceOrienModal();
+            resolve("resolve");
+          } else {
+            alert(alertMessage);
+            reject("resolve");
+          }
+        });
+      } else {
+        alert(alertMessage);
+        reject("resolve");
+      }
+    });
+  });
+};
+
+const hideDeviceOrienModal = () => {
+  deviceOrienModal.classList.add("is-hidden");
+};
+
+const initThree = () => {
+  w = window.innerWidth;
+  h = window.innerHeight;
+  canvas = document.getElementById("canvas");
+  setScene();
+  setCamera();
+  setObject();
+  setRenderer();
+  controls = new DeviceOrientationControls(camera, true);
+};
+
+const setScene = () => {
+  scene = new THREE.Scene();
+};
+
+const setCamera = () => {
+  camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 30);
+  camera.position.set(0, 0, 5);
+  camera.lookAt(0, 0, 0);
+  scene.add(camera);
+};
+
+const setObject = () => {
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshNormalMaterial();
+  object = new THREE.Mesh(geometry, material);
+  object.position.set(0, 0, 0);
+  scene.add(object);
+};
+
+const setRenderer = () => {
+  renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true,
+    canvas: canvas,
+  });
+  renderer.setClearColor(0x000000, 0);
+  renderer.setSize(w, h);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setAnimationLoop(() => {
+    render();
+  });
+};
+
+const render = () => {
+  object.rotation.x += 0.01;
+  object.rotation.y += 0.01;
+  controls.update();
+  renderer.render(scene, camera);
+};
+
+window.onload = () => {
+  checkDeviceOrien()
+    .then(() => {
+      initThree();
+      initVideo();
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+};
