@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-ar-session/dist/aframe-ar-session.js"></script>
+  </head>
+  <body>
+    <a-scene
+      ar-session
+      plane-detection="enabled: true;"
+      renderer="antialias: true; logarithmicDepthBuffer: true;">
+      <a-plane
+        id="ground"
+        position="0 0 0"
+        rotation="-90 0 0"
+        width="10"
+        height="10"
+        material="color: #ffffff; opacity: 0.5;"></a-plane>
+    </a-scene>
+  </body>
+</html>
