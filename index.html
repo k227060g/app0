@@ -1,61 +1,80 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>AR Cube App</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0"
+    />
+    <title>marker-less</title>
+    <script src="./script.js"></script>
     <style>
-        body { 
-            margin: 0;
-            background-color: #1A202C;
-            color: white;
-            font-family: sans-serif;
-            overflow: hidden;
-        }
-        canvas { display: block; }
-        #title-container {
-            position: absolute;
-            top: 40%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 5;
-            width: 90%;
-        }
-        #title-container h1 {
-            font-size: 2.2rem;
-            font-weight: bold;
-            line-height: 1.4;
-            color: white;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-        }
-        #ARButton {
-            color: white !important;
-            background-color: rgba(255, 255, 255, 0.2) !important;
-            border: 1px solid rgba(255, 255, 255, 0.3) !important;
-            backdrop-filter: blur(10px) !important;
-            -webkit-backdrop-filter: blur(10px) !important;
-            border-radius: 9999px !important;
-            font-size: 16px !important;
-            font-weight: bold !important;
-            padding: 14px 24px !important;
-            min-width: 220px !important;
-            box-shadow: none !important;
-            opacity: 1 !important;
-            position: absolute !important;
-            bottom: 15% !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-            z-index: 100 !important;
-            white-space: nowrap !important;
-        }
-        /* その他のUIスタイルは省略 */
+      body {
+        overflow: hidden;
+        margin: 0;
+        font-size: 0.9rem;
+        font-family: sans-serif;
+      }
+      .device-orien-modal {
+        z-index: 1;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        position: fixed;
+        top: 0;
+        left: 0;
+        background: rgba(0, 0, 0, 0.7);
+      }
+      .device-orien-modal-inner {
+        width: 90%;
+        max-width: 350px;
+        box-sizing: border-box;
+        height: auto;
+        padding: 1.3rem;
+        margin: auto;
+        background: white;
+        display: flex;
+        flex-direction: column;
+      }
+      .device-orien-modal-button {
+        margin: 1rem auto auto;
+        padding: 0.8rem 1.3rem;
+        background: black;
+        color: white;
+        width: 130px;
+      }
+      .is-hidden {
+        display: none;
+      }
+      .canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+      .camera {
+        position: fixed;
+        top: 0;
+        left: 0;
+      }
     </style>
-</head>
-<body>
-    <div id="title-container">
-        <h1>AR App with a Cube</h1>
-        <p>Tap 'START AR' and then tap the screen to place a cube.</p>
+  </head>
+  <body>
+    <div id="device-orien-modal" class="device-orien-modal is-hidden">
+      <div class="device-orien-modal-inner">
+        <p>
+          このページでは端末の向きと方向を取得します。<br />
+          次に表示されるポップアップに従って「許可」を選択してください。
+        </p>
+        <button
+          id="device-orien-modal-button"
+          class="device-orien-modal-button"
+        >
+          OK
+        </button>
+      </div>
     </div>
-    <script type="module" src="main.js"></script>
-</body>
+    <canvas id="canvas" class="canvas"></canvas>
+    <video src="" id="camera" class="camera" playsinline></video>
+  </body>
 </html>
